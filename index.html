@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entropy Sistemas | Dominando a Complexidade</title>
+    <link rel="icon" type="image/png" sizes="64x64" href="py.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    
+    <!-- Script para detectar tema na inicialização (evita flash branco/preto) -->
+    <script>
+        try {
+            const savedTheme = localStorage.getItem('entropy-theme');
+            if (savedTheme === 'light' || (!savedTheme && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+                document.documentElement.classList.add('light');
+            }
+        } catch (e) {}
+    </script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- GSAP for Smooth Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <!-- Google Fonts: Inter (Latin/Cyrillic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            black: '#050505',
+                            dark: '#0a0a0a',
+                            gray: '#171717',
+                            light: '#e5e5e5',
+                            accent: '#ffffff'
+                        }
+                    },
+                    letterSpacing: {
+                        widest: '.25em',
+                        superwide: '.5em',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #050505;
+            color: #e5e5e5;
+            overflow-x: hidden;
+        }
+
+        /* Canvas stays purely in the background */
+        #entropy-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Vapor (Thanos snap) particles drawn above the hero title */
+        #vapor-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* Mini logo / footer decay effect */
+        .entropy-text-effect {
+            display: inline-block;
+            color: #ffffff;
+            filter: url(#decay-filter);
+            transition: filter 0.3s ease;
+        }
+
+        /* Hero letters: O weak, P stronger, Y strongest */
+        .vap { display: inline-block; color: #fff; will-change: filter; }
+        .vap-o {
+            filter: url(#decay-o);
+            -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 55%, rgba(0,0,0,.78) 100%);
+                    mask-image: linear-gradient(90deg, #000 0%, #000 55%, rgba(0,0,0,.78) 100%);
+        }
+        .vap-p {
+            filter: url(#decay-p);
+            -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,.95) 0%, rgba(0,0,0,.8) 35%, rgba(0,0,0,.55) 70%, rgba(0,0,0,.3) 100%);
+                    mask-image: linear-gradient(90deg, rgba(0,0,0,.95) 0%, rgba(0,0,0,.8) 35%, rgba(0,0,0,.55) 70%, rgba(0,0,0,.3) 100%);
+        }
+        .vap-y {
+            filter: url(#decay-y);
+            -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,.65) 0%, rgba(0,0,0,.45) 35%, rgba(0,0,0,.25) 70%, rgba(0,0,0,.08) 100%);
+                    mask-image: linear-gradient(90deg, rgba(0,0,0,.65) 0%, rgba(0,0,0,.45) 35%, rgba(0,0,0,.25) 70%, rgba(0,0,0,.08) 100%);
+        }
+
+        .hero-title {
+            font-size: clamp(3.5rem, 10vw, 8rem);
+            line-height: 1;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(0.7rem, 2vw, 1.25rem);
+        }
+
+        /* Premium hover glows for cards */
+        .service-card {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .service-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 40px -10px rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .social-card {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .social-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        /* Language dropdown */
+        #lang-menu { display: none; }
+        #lang-menu.open { display: block; }
+
+        /* ===== LIGHT MODE ===== */
+        html.light body { background-color: #f5f5f4; color: #262626; }
+        html.light .text-white { color: #0a0a0a !important; }
+        html.light .text-gray-200, html.light .text-gray-300 { color: #262626 !important; }
+        html.light .text-gray-400 { color: #52525b !important; }
+        html.light .text-gray-500, html.light .text-gray-600 { color: #71717a !important; }
+        html.light .text-black { color: #ffffff !important; }
+        html.light .bg-white { background-color: #0a0a0a !important; }
+        html.light .hover\:bg-gray-200:hover { background-color: #2e2e2e !important; }
+        html.light .hover\:bg-white:hover { background-color: #0a0a0a !important; }
+        html.light .hover\:text-black:hover { color: #ffffff !important; }
+        html.light .hover\:text-white:hover { color: #000000 !important; }
+        html.light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,.07) !important; }
+        html.light [class*="bg-brand-"] { background-color: rgba(245,245,244,.82) !important; }
+        html.light [class*="bg-[#0a0a0a]"] { background-color: #ffffff !important; }
+        html.light [class*="border-white"] { border-color: rgba(0,0,0,.12) !important; }
+        html.light [class~="bg-white/5"], html.light [class~="bg-white/10"], html.light [class~="bg-white/[0.02]"] { background-color: rgba(0,0,0,.05) !important; }
+        html.light [class~="bg-white/30"] { background-color: rgba(0,0,0,.3) !important; }
+        html.light .from-white {
+            --tw-gradient-from: #0a0a0a !important;
+            --tw-gradient-to: rgba(10,10,10,0) !important;
+            --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+        }
+        html.light [class*="shadow-[0_0_40px"] { box-shadow: 0 12px 32px rgba(0,0,0,.22) !important; }
+        html.light .service-card:hover { box-shadow: 0 10px 40px -10px rgba(0,0,0,.18); border-color: rgba(0,0,0,.25) !important; }
+        html.light .social-card:hover { background-color: rgba(0,0,0,.08) !important; border-color: rgba(0,0,0,.3) !important; }
+        html.light .vap { color: #0a0a0a; }
+        html.light #lang-menu { box-shadow: 0 20px 40px rgba(0,0,0,.15); }
+        html.light ::-webkit-scrollbar-track { background: #f5f5f4; }
+        html.light ::-webkit-scrollbar-thumb { background: #bbb; }
+        html.light ::-webkit-scrollbar-thumb:hover { background: #999; }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #050505;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-white selection:text-black">
+
+    <!-- SVG filters: granular, breaking-apart effect -->
+    <svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
+        <defs>
+            <!-- Mini logo / footer -->
+            <filter id="decay-filter" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.1" numOctaves="3" result="noise" id="turbulence">
+                    <animate attributeName="baseFrequency" values="0.15;0.12;0.15" dur="4s" repeatCount="indefinite" />
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" id="displacement" />
+                <feGaussianBlur stdDeviation="0.5" result="blur" />
+                <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                </feMerge>
+            </filter>
+
+            <!-- Hero: O (weak) -->
+            <filter id="decay-o" x="-30%" y="-30%" width="170%" height="160%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="3" result="noise" id="t-o">
+                    <animate attributeName="baseFrequency" values="0.09;0.12;0.09" dur="5s" repeatCount="indefinite" />
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" id="d-o" />
+            </filter>
+
+            <!-- Hero: P (stronger) -->
+            <filter id="decay-p" x="-40%" y="-40%" width="200%" height="180%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.14" numOctaves="3" result="noise" id="t-p">
+                    <animate attributeName="baseFrequency" values="0.14;0.19;0.14" dur="4s" repeatCount="indefinite" />
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="10" xChannelSelector="R" yChannelSelector="G" id="d-p" />
+            </filter>
+
+            <!-- Hero: Y (strongest) -->
+            <filter id="decay-y" x="-60%" y="-60%" width="260%" height="220%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="3" result="noise" id="t-y">
+                    <animate attributeName="baseFrequency" values="0.2;0.28;0.2" dur="3.2s" repeatCount="indefinite" />
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G" id="d-y" />
+            </filter>
+        </defs>
+    </svg>
+
+    <canvas id="entropy-canvas"></canvas>
+    <canvas id="vapor-canvas"></canvas>
+
+    <header class="fixed top-0 w-full z-50 bg-brand-black/60 backdrop-blur-md border-b border-white/5 transition-all duration-300" id="navbar">
+        <div class="max-w-7xl mx-auto px-4 md:px-12 py-4 flex justify-between items-center gap-3">
+            <!-- Mini Logo -->
+            <div class="flex flex-col items-start cursor-pointer">
+                <span class="font-black text-xl tracking-tight text-white leading-none">
+                    ENTRO<span style="filter: url(#decay-filter);">PY</span>
+                </span>
+                <span class="text-[0.4rem] tracking-superwide text-gray-400 mt-1 font-medium" data-sys>SISTEMAS</span>
+            </div>
+            
+            <nav class="hidden md:flex gap-8 text-sm font-medium text-gray-400">
+                <a href="#services" class="hover:text-white transition-colors" data-i18n="nav_services">Serviços</a>
+                <a href="#about" class="hover:text-white transition-colors" data-i18n="nav_concept">Conceito</a>
+                <a href="#contact" class="hover:text-white transition-colors" data-i18n="nav_contact">Contato</a>
+            </nav>
+
+            <div class="flex items-center gap-1.5 md:gap-3">
+                <a href="#contact" class="text-xs md:text-sm font-semibold text-black bg-white px-4 md:px-5 py-2 rounded-full hover:bg-gray-200 transition-colors whitespace-nowrap" data-i18n="cta_start">
+                    Iniciar Projeto
+                </a>
+
+                <!-- Theme toggle -->
+                <button id="theme-btn" type="button" aria-label="Toggle light / dark mode"
+                    class="flex items-center justify-center w-9 h-9 text-white border border-white/20 rounded-full hover:bg-white/10 transition-colors">
+                    <svg id="theme-sun" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                    <svg id="theme-moon" class="w-4 h-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                </button>
+
+                <!-- Language selector -->
+                <div class="relative">
+                    <button id="lang-btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Language"
+                        class="flex items-center gap-1.5 text-xs md:text-sm font-semibold text-white border border-white/20 px-3 py-2 rounded-full hover:bg-white/10 transition-colors">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="9" />
+                            <path stroke-linecap="round" d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z" />
+                        </svg>
+                        <span id="lang-current">PT</span>
+                        <svg class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <ul id="lang-menu" role="listbox" class="absolute right-0 mt-3 w-52 bg-[#0a0a0a] border border-white/10 rounded-2xl p-2 shadow-2xl shadow-black/60">
+                        <li><button type="button" data-lang="pt-BR" class="lang-opt w-full text-left px-4 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors">Português (BR)</button></li>
+                        <li><button type="button" data-lang="en-US" class="lang-opt w-full text-left px-4 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors">English (US)</button></li>
+                        <li><button type="button" data-lang="ru" class="lang-opt w-full text-left px-4 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors">Русский</button></li>
+                        <li><button type="button" data-lang="fr" class="lang-opt w-full text-left px-4 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors">Français</button></li>
+                        <li><button type="button" data-lang="it" class="lang-opt w-full text-left px-4 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors">Italiano</button></li>
+                        <li><button type="button" data-lang="es" class="lang-opt w-full text-left px-4 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors">Español</button></li>
+                        <li><button type="button" data-lang="zh-CN" class="lang-opt w-full text-left px-4 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors">中文 (简体)</button></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="relative min-h-screen flex items-center justify-center pt-20 px-6">
+            <div class="max-w-5xl mx-auto text-center flex flex-col items-center z-10 w-full">
+                
+                <!-- Main Brand Mark -->
+                <div class="gsap-hero-element mb-6 select-none flex flex-col items-center">
+                    <!-- Split letters for independent hover effect -->
+                    <h1 class="hero-title font-black text-white tracking-tighter uppercase flex" id="hero-title">
+                        <span class="hero-char inline-block">E</span>
+                        <span class="hero-char inline-block">N</span>
+                        <span class="hero-char inline-block">T</span>
+                        <span class="hero-char inline-block">R</span>
+                        <span class="vap vap-o hero-char inline-block" id="L-o">O</span>
+                        <span class="vap vap-p hero-char inline-block" id="L-p">P</span>
+                        <span class="vap vap-y hero-char inline-block" id="L-y">Y</span>
+                    </h1>
+                    <h2 class="hero-subtitle tracking-superwide text-gray-400 font-light mt-4 md:mt-2 uppercase">
+                        <span data-sys-spaced>S I S T E M A S</span>
+                    </h2>
+                </div>
+
+                <p class="gsap-hero-element text-lg md:text-2xl text-gray-400 max-w-2xl mt-8 font-light leading-relaxed" data-i18n-html="tagline">
+                    Dominando a complexidade. <br class="md:hidden">Escalando o futuro.
+                </p>
+                
+                <div class="gsap-hero-element mt-12">
+                    <a href="#services" class="group relative inline-flex items-center justify-center px-8 py-4 text-sm font-semibold text-white transition-all duration-200 bg-transparent border border-white/20 rounded-full hover:bg-white hover:text-black overflow-hidden">
+                        <span class="relative z-10" data-i18n="explore">Explorar Soluções</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Scroll Indicator -->
+            <div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50 gsap-hero-element">
+                <span class="text-[10px] tracking-widest uppercase" data-i18n="scroll">Scroll</span>
+                <div class="w-[1px] h-12 bg-gradient-to-b from-white to-transparent"></div>
+            </div>
+        </section>
+
+        <section id="services" class="py-24 md:py-36 px-6 relative z-10">
+            <div class="max-w-7xl mx-auto">
+                <div class="gsap-reveal mb-14 md:mb-16 max-w-3xl">
+                    <h3 class="text-sm font-semibold tracking-widest text-gray-500 uppercase mb-4" data-i18n="wd_label">O que fazemos</h3>
+                    <h2 class="text-3xl md:text-5xl font-bold text-white tracking-tight mb-5" data-i18n="wd_title">Soluções digitais sob medida</h2>
+                    <p class="text-gray-400 text-base md:text-lg leading-relaxed" data-i18n="wd_text">Da ideia ao ar: desenhamos, desenvolvemos e colocamos em produção o software que o seu negócio precisa.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Sites -->
+                    <div class="service-card gsap-reveal bg-[#0a0a0a] border border-white/5 rounded-2xl p-8 md:p-10 flex flex-col h-full">
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path stroke-linecap="round" d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg>
+                            </div>
+                            <span class="text-xs tracking-widest text-gray-500 font-semibold">01</span>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4" data-i18n="wd1_t">Sites</h3>
+                        <p class="text-gray-400 text-sm md:text-base leading-relaxed" data-i18n="wd1_d">Sites institucionais, landing pages e e-commerces rápidos, responsivos e otimizados para buscadores, com design único que traduz a identidade da sua marca e converte visitantes em clientes.</p>
+                    </div>
+
+                    <!-- Sistemas -->
+                    <div class="service-card gsap-reveal bg-[#0a0a0a] border border-white/5 rounded-2xl p-8 md:p-10 flex flex-col h-full">
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="6" rx="8" ry="3"/><path stroke-linecap="round" d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+                            </div>
+                            <span class="text-xs tracking-widest text-gray-500 font-semibold">02</span>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4" data-i18n="wd2_t">Sistemas</h3>
+                        <p class="text-gray-400 text-sm md:text-base leading-relaxed" data-i18n="wd2_d">Sistemas web sob medida para gestão, ERP, CRM e painéis administrativos. Centralizamos processos, organizamos dados e entregamos plataformas seguras que crescem junto com a sua operação.</p>
+                    </div>
+
+                    <!-- Aplicativos -->
+                    <div class="service-card gsap-reveal bg-[#0a0a0a] border border-white/5 rounded-2xl p-8 md:p-10 flex flex-col h-full">
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="7" y="2" width="10" height="20" rx="2"/><path stroke-linecap="round" d="M11 18h2"/></svg>
+                            </div>
+                            <span class="text-xs tracking-widest text-gray-500 font-semibold">03</span>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4" data-i18n="wd3_t">Aplicativos</h3>
+                        <p class="text-gray-400 text-sm md:text-base leading-relaxed" data-i18n="wd3_d">Apps para iOS e Android, nativos ou multiplataforma, com experiência fluida, notificações e integração com seus sistemas, do protótipo à publicação nas lojas.</p>
+                    </div>
+
+                    <!-- Automações -->
+                    <div class="service-card gsap-reveal bg-[#0a0a0a] border border-white/5 rounded-2xl p-8 md:p-10 flex flex-col h-full">
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12a8 8 0 0113.7-5.7L20 8M20 4v4h-4M20 12a8 8 0 01-13.7 5.7L4 16M4 20v-4h4"/></svg>
+                            </div>
+                            <span class="text-xs tracking-widest text-gray-500 font-semibold">04</span>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4" data-i18n="wd4_t">Automações</h3>
+                        <p class="text-gray-400 text-sm md:text-base leading-relaxed" data-i18n="wd4_d">Eliminamos tarefas repetitivas integrando ferramentas, APIs e fluxos de trabalho: cobranças, relatórios, atendimento e cadastros rodando sozinhos, com menos erros e mais tempo para o que importa.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="about" class="py-24 md:py-40 px-6 relative z-10 bg-brand-dark/80 backdrop-blur-sm border-y border-white/5">
+            <div class="max-w-4xl mx-auto">
+                <div class="gsap-reveal border-l-2 border-white/20 pl-6 md:pl-10">
+                    <h3 class="text-sm font-semibold tracking-widest text-gray-500 uppercase mb-6" data-i18n="about_label">O Conceito</h3>
+                    <p class="text-2xl md:text-5xl font-light text-gray-200 leading-tight md:leading-tight" data-i18n-html="about_title">
+                        Transformamos a <span class="font-semibold text-white relative inline-block">
+                            desordem tecnológica
+                            <span class="absolute bottom-1 left-0 w-full h-[2px] bg-white/30"></span>
+                        </span> em sistemas precisos, resilientes e infinitamente escaláveis.
+                    </p>
+                    <p class="mt-8 text-base md:text-lg text-gray-400 max-w-2xl leading-relaxed" data-i18n="about_text">
+                        A entropia dita que todo sistema fechado caminha para a desordem. Na engenharia de software, nós somos a força oposta. Aplicamos matemática, arquitetura limpa e padrões de alta performance para garantir que sua infraestrutura mantenha a ordem enquanto cresce de forma exponencial.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="expertise" class="py-24 md:py-40 px-6 relative z-10">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 gap-4 md:gap-8 gsap-reveal">
+                    <div class="max-w-2xl text-left">
+                        <h3 class="text-sm font-semibold tracking-widest text-gray-500 uppercase mb-3 md:mb-4" data-i18n="exp_label">Expertise</h3>
+                        <h2 class="text-3xl md:text-5xl font-bold text-white tracking-tight" data-i18n="exp_title">Arquitetura de Elite</h2>
+                    </div>
+                    <p class="text-gray-400 max-w-md text-sm md:text-base leading-relaxed text-left md:text-right" data-i18n="exp_text">
+                        Soluções B2B desenhadas para ambientes de missão crítica. Construímos as fundações digitais das empresas mais exigentes do mercado.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Service 1 -->
+                    <div class="service-card gsap-reveal bg-[#0a0a0a] border border-white/5 rounded-2xl p-10 flex flex-col h-full">
+                        <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mb-8">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4" data-i18n="s1_t">Arquitetura de Sistemas</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed flex-grow" data-i18n="s1_d">
+                            Design de microsserviços, modelagem de domínios (DDD) e padrões arquiteturais que suportam evolução constante sem acumular débito técnico.
+                        </p>
+                    </div>
+
+                    <!-- Service 2 -->
+                    <div class="service-card gsap-reveal bg-[#0a0a0a] border border-white/5 rounded-2xl p-10 flex flex-col h-full" style="transition-delay: 100ms;">
+                        <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mb-8">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4" data-i18n="s2_t">Infraestrutura Cloud</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed flex-grow" data-i18n="s2_d">
+                            Provisionamento automatizado (IaC), orquestração com Kubernetes, otimização de custos e alta disponibilidade distribuída globalmente.
+                        </p>
+                    </div>
+
+                    <!-- Service 3 -->
+                    <div class="service-card gsap-reveal bg-[#0a0a0a] border border-white/5 rounded-2xl p-10 flex flex-col h-full" style="transition-delay: 200ms;">
+                        <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mb-8">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4" data-i18n="s3_t">APIs Escaláveis</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed flex-grow" data-i18n="s3_d">
+                            Desenvolvimento de integrações robustas, gateways seguros e processamento assíncrono capaz de lidar com milhões de requisições por segundo.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact" class="py-32 px-6 relative z-10 bg-brand-black">
+            <div class="max-w-4xl mx-auto text-center gsap-reveal">
+                <h2 class="text-4xl md:text-6xl font-bold text-white tracking-tight mb-8" data-i18n-html="contact_title">Pronto para transformar<br>sua operação?</h2>
+                <p class="text-gray-400 text-lg mb-12 max-w-xl mx-auto" data-i18n="contact_text">
+                    Converse com nossos engenheiros arquitetos e descubra como podemos estruturar a próxima fase de crescimento da sua empresa.
+                </p>
+                <a id="schedule-btn" href="https://wa.me/5522992294604" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-10 py-5 text-base font-semibold text-black bg-white rounded-full hover:bg-gray-200 transition-colors shadow-[0_0_40px_rgba(255,255,255,0.2)]" data-i18n="contact_cta">
+                    Agendar Consultoria Técnica
+                </a>
+
+                <!-- Social networks -->
+                <div class="mt-20">
+                    <h3 class="text-sm font-semibold tracking-widest text-gray-500 uppercase mb-8" data-i18n="social_label">Siga-nos</h3>
+                    <div class="flex justify-center mb-4">
+                        <a href="mailto:contatoentropysistemas@gmail.com" class="social-card inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-6 py-3 max-w-full">
+                            <svg class="w-5 h-5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9 6 9-6"/></svg>
+                            <span class="text-white text-sm font-semibold break-all">contatoentropysistemas@gmail.com</span>
+                        </a>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                        <a href="https://www.linkedin.com/company/entropysistemas" target="_blank" rel="noopener noreferrer" class="social-card flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-6">
+                            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                            <span class="text-white text-sm font-semibold">LinkedIn</span>
+                            <span class="text-gray-500 text-xs">@entropysistemas</span>
+                        </a>
+                        <a href="https://www.facebook.com/entropysistemas" target="_blank" rel="noopener noreferrer" class="social-card flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-6">
+                            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                            <span class="text-white text-sm font-semibold">Facebook</span>
+                            <span class="text-gray-500 text-xs">@entropysistemas</span>
+                        </a>
+                        <a href="https://x.com/entropysistemas" target="_blank" rel="noopener noreferrer" class="social-card flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-6">
+                            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            <span class="text-white text-sm font-semibold">X</span>
+                            <span class="text-gray-500 text-xs">@entropysistemas</span>
+                        </a>
+                        <a href="https://www.instagram.com/entropysistemas" target="_blank" rel="noopener noreferrer" class="social-card flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-6">
+                            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                            <span class="text-white text-sm font-semibold">Instagram</span>
+                            <span class="text-gray-500 text-xs">@entropysistemas</span>
+                        </a>
+                        <a href="https://wa.me/5522992294604" target="_blank" rel="noopener noreferrer" class="social-card flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-6 col-span-2 sm:col-span-1">
+                            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                            <span class="text-white text-sm font-semibold">WhatsApp</span>
+                            <span class="text-gray-500 text-xs">@entropysistemas</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Schedule consultation modal -->
+    <div id="schedule-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="relative w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 shadow-2xl">
+            <button id="modal-close" type="button" aria-label="Close" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+            <h3 id="modal-title" class="text-2xl font-bold text-white mb-2 pr-8" data-i18n="modal_title">Qual é o seu projeto?</h3>
+            <p class="text-gray-400 text-sm mb-6" data-i18n="modal_sub">Escolha uma opção e abriremos o WhatsApp com a mensagem pronta.</p>
+            <div class="flex flex-col gap-3">
+                <button type="button" data-opt="site" class="schedule-opt flex items-center justify-between w-full px-5 py-4 rounded-2xl border border-white/10 bg-white/[0.02] text-white text-left font-semibold hover:bg-white/10 transition-colors"><span data-i18n="opt_site">Site</span><span aria-hidden="true">→</span></button>
+                <button type="button" data-opt="system" class="schedule-opt flex items-center justify-between w-full px-5 py-4 rounded-2xl border border-white/10 bg-white/[0.02] text-white text-left font-semibold hover:bg-white/10 transition-colors"><span data-i18n="opt_system">Sistema</span><span aria-hidden="true">→</span></button>
+                <button type="button" data-opt="app" class="schedule-opt flex items-center justify-between w-full px-5 py-4 rounded-2xl border border-white/10 bg-white/[0.02] text-white text-left font-semibold hover:bg-white/10 transition-colors"><span data-i18n="opt_app">Aplicativo</span><span aria-hidden="true">→</span></button>
+                <button type="button" data-opt="auto" class="schedule-opt flex items-center justify-between w-full px-5 py-4 rounded-2xl border border-white/10 bg-white/[0.02] text-white text-left font-semibold hover:bg-white/10 transition-colors"><span data-i18n="opt_auto">Automação</span><span aria-hidden="true">→</span></button>
+                <button type="button" data-opt="other" class="schedule-opt flex items-center justify-between w-full px-5 py-4 rounded-2xl border border-white/10 bg-white/[0.02] text-white text-left font-semibold hover:bg-white/10 transition-colors"><span data-i18n="opt_other">Outro</span><span aria-hidden="true">→</span></button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="border-t border-white/10 bg-brand-dark py-12 px-6 relative z-10 text-sm">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex flex-col items-center md:items-start opacity-70">
+                <span class="font-black text-lg tracking-tight text-white leading-none">
+                    ENTROPY
+                </span>
+                <span class="text-[0.4rem] tracking-superwide text-gray-400 mt-1 font-medium" data-sys>SISTEMAS</span>
+            </div>
+            
+            <div class="text-gray-500 flex gap-6 text-xs md:text-sm">
+                <a href="#" class="hover:text-white transition-colors" data-i18n="terms">Termos</a>
+                <a href="#" class="hover:text-white transition-colors" data-i18n="privacy">Privacidade</a>
+                <a href="#" class="hover:text-white transition-colors">GitHub</a>
+                <a href="https://www.linkedin.com/company/entropysistemas" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">LinkedIn</a>
+            </div>
+            
+            <div class="text-gray-600 text-xs" data-i18n="copy">
+                &copy; 2026 Entropy Sistemas. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 0. TRANSLATIONS ---
+            const hl = t => `<span class="font-semibold text-white relative inline-block">${t}<span class="absolute bottom-1 left-0 w-full h-[2px] bg-white/30"></span></span>`;
+
+            const I18N = {
+                'pt-BR': {
+                    short: 'PT', htmlLang: 'pt-BR',
+                    nav_services: 'Serviços', nav_concept: 'Conceito', nav_contact: 'Contato',
+                    cta_start: 'Iniciar Projeto',
+                    tagline: 'Dominando a complexidade. <br class="md:hidden">Escalando o futuro.',
+                    explore: 'Explorar Soluções',
+                    scroll: 'Rolar',
+                    about_label: 'O Conceito',
+                    about_title: `Transformamos a ${hl('desordem tecnológica')} em sistemas precisos, resilientes e infinitamente escaláveis.`,
+                    about_text: 'A entropia dita que todo sistema fechado caminha para a desordem. Na engenharia de software, nós somos a força oposta. Aplicamos matemática, arquitetura limpa e padrões de alta performance para garantir que sua infraestrutura mantenha a ordem enquanto cresce de forma exponencial.',
+                    exp_label: 'Expertise', exp_title: 'Arquitetura de Elite',
+                    exp_text: 'Soluções B2B desenhadas para ambientes de missão crítica. Construímos as fundações digitais das empresas mais exigentes do mercado.',
+                    s1_t: 'Arquitetura de Sistemas', s1_d: 'Design de microsserviços, modelagem de domínios (DDD) e padrões arquiteturais que suportam evolução constante sem acumular débito técnico.',
+                    s2_t: 'Infraestrutura Cloud', s2_d: 'Provisionamento automatizado (IaC), orquestração com Kubernetes, otimização de custos e alta disponibilidade distribuída globalmente.',
+                    s3_t: 'APIs Escaláveis', s3_d: 'Desenvolvimento de integrações robustas, gateways seguros e processamento assíncrono capaz de lidar com milhões de requisições por segundo.',
+                    contact_title: 'Pronto para transformar<br>sua operação?',
+                    contact_text: 'Converse com nossos engenheiros arquitetos e descubra como podemos estruturar a próxima fase de crescimento da sua empresa.',
+                    contact_cta: 'Agendar Consultoria Técnica',
+                    social_label: 'Siga-nos',
+                    terms: 'Termos', privacy: 'Privacidade',
+                    copy: '&copy; 2026 Entropy Sistemas. Todos os direitos reservados.'
+                },
+                'en-US': {
+                    short: 'EN', htmlLang: 'en-US',
+                    nav_services: 'Services', nav_concept: 'Concept', nav_contact: 'Contact',
+                    cta_start: 'Start Project',
+                    tagline: 'Mastering complexity. <br class="md:hidden">Scaling the future.',
+                    explore: 'Explore Solutions',
+                    scroll: 'Scroll',
+                    about_label: 'The Concept',
+                    about_title: `We turn ${hl('technological disorder')} into precise, resilient and infinitely scalable systems.`,
+                    about_text: 'Entropy dictates that every closed system drifts toward disorder. In software engineering, we are the opposing force. We apply mathematics, clean architecture and high-performance patterns to make sure your infrastructure keeps its order while it grows exponentially.',
+                    exp_label: 'Expertise', exp_title: 'Elite Architecture',
+                    exp_text: 'B2B solutions designed for mission-critical environments. We build the digital foundations of the most demanding companies in the market.',
+                    s1_t: 'Systems Architecture', s1_d: 'Microservices design, domain modeling (DDD) and architectural patterns that support constant evolution without piling up technical debt.',
+                    s2_t: 'Cloud Infrastructure', s2_d: 'Automated provisioning (IaC), Kubernetes orchestration, cost optimization and globally distributed high availability.',
+                    s3_t: 'Scalable APIs', s3_d: 'Robust integrations, secure gateways and asynchronous processing capable of handling millions of requests per second.',
+                    contact_title: 'Ready to transform<br>your operation?',
+                    contact_text: 'Talk to our architect engineers and find out how we can structure the next growth phase of your company.',
+                    contact_cta: 'Schedule Technical Consultation',
+                    social_label: 'Follow us',
+                    terms: 'Terms', privacy: 'Privacy',
+                    copy: '&copy; 2026 Entropy Sistemas. All rights reserved.'
+                },
+                'ru': {
+                    short: 'RU', htmlLang: 'ru',
+                    nav_services: 'Услуги', nav_concept: 'Концепция', nav_contact: 'Контакты',
+                    cta_start: 'Начать проект',
+                    tagline: 'Покоряем сложность. <br class="md:hidden">Масштабируем будущее.',
+                    explore: 'Изучить решения',
+                    scroll: 'Прокрутить',
+                    about_label: 'Концепция',
+                    about_title: `Мы превращаем ${hl('технологический хаос')} в точные, устойчивые и бесконечно масштабируемые системы.`,
+                    about_text: 'Энтропия гласит, что любая замкнутая система движется к беспорядку. В программной инженерии мы — противоположная сила. Мы применяем математику, чистую архитектуру и высокопроизводительные паттерны, чтобы ваша инфраструктура сохраняла порядок при экспоненциальном росте.',
+                    exp_label: 'Экспертиза', exp_title: 'Элитная архитектура',
+                    exp_text: 'B2B-решения для критически важных сред. Мы строим цифровой фундамент для самых требовательных компаний рынка.',
+                    s1_t: 'Архитектура систем', s1_d: 'Проектирование микросервисов, доменное моделирование (DDD) и архитектурные паттерны, поддерживающие постоянное развитие без накопления технического долга.',
+                    s2_t: 'Облачная инфраструктура', s2_d: 'Автоматизированное развертывание (IaC), оркестрация Kubernetes, оптимизация затрат и глобально распределенная высокая доступность.',
+                    s3_t: 'Масштабируемые API', s3_d: 'Надежные интеграции, безопасные шлюзы и асинхронная обработка, способная выдерживать миллионы запросов в секунду.',
+                    contact_title: 'Готовы преобразить<br>свой бизнес?',
+                    contact_text: 'Поговорите с нашими инженерами-архитекторами и узнайте, как мы можем выстроить следующий этап роста вашей компании.',
+                    contact_cta: 'Записаться на техническую консультацию',
+                    social_label: 'Мы в соцсетях',
+                    terms: 'Условия', privacy: 'Конфиденциальность',
+                    copy: '&copy; 2026 Entropy Sistemas. Все права защищены.'
+                },
+                'fr': {
+                    short: 'FR', htmlLang: 'fr',
+                    nav_services: 'Services', nav_concept: 'Concept', nav_contact: 'Contact',
+                    cta_start: 'Démarrer un projet',
+                    tagline: 'Maîtriser la complexité. <br class="md:hidden">Faire évoluer l\'avenir.',
+                    explore: 'Explorer les solutions',
+                    scroll: 'Défiler',
+                    about_label: 'Le Concept',
+                    about_title: `Nous transformons le ${hl('désordre technologique')} en systèmes précis, résilients et infiniment évolutifs.`,
+                    about_text: 'L\'entropie dicte que tout système fermé évolue vers le désordre. En ingénierie logicielle, nous sommes la force opposée. Nous appliquons les mathématiques, une architecture propre et des modèles haute performance pour que votre infrastructure garde son ordre tout en croissant de façon exponentielle.',
+                    exp_label: 'Expertise', exp_title: 'Architecture d\'élite',
+                    exp_text: 'Des solutions B2B conçues pour les environnements critiques. Nous bâtissons les fondations numériques des entreprises les plus exigeantes du marché.',
+                    s1_t: 'Architecture des systèmes', s1_d: 'Conception de microservices, modélisation de domaine (DDD) et modèles architecturaux qui soutiennent une évolution constante sans accumuler de dette technique.',
+                    s2_t: 'Infrastructure Cloud', s2_d: 'Provisionnement automatisé (IaC), orchestration Kubernetes, optimisation des coûts et haute disponibilité distribuée à l\'échelle mondiale.',
+                    s3_t: 'API évolutives', s3_d: 'Intégrations robustes, passerelles sécurisées et traitement asynchrone capable de gérer des millions de requêtes par seconde.',
+                    contact_title: 'Prêt à transformer<br>votre activité ?',
+                    contact_text: 'Échangez avec nos ingénieurs architectes et découvrez comment structurer la prochaine phase de croissance de votre entreprise.',
+                    contact_cta: 'Planifier une consultation technique',
+                    social_label: 'Suivez-nous',
+                    terms: 'Conditions', privacy: 'Confidentialité',
+                    copy: '&copy; 2026 Entropy Sistemas. Tous droits réservés.'
+                },
+                'it': {
+                    short: 'IT', htmlLang: 'it',
+                    nav_services: 'Servizi', nav_concept: 'Concetto', nav_contact: 'Contatti',
+                    cta_start: 'Avvia progetto',
+                    tagline: 'Dominare la complessità. <br class="md:hidden">Scalare il futuro.',
+                    explore: 'Esplora le soluzioni',
+                    scroll: 'Scorri',
+                    about_label: 'Il Concetto',
+                    about_title: `Trasformiamo il ${hl('disordine tecnologico')} in sistemi precisi, resilienti e infinitamente scalabili.`,
+                    about_text: 'L\'entropia stabilisce che ogni sistema chiuso tende al disordine. Nell\'ingegneria del software, noi siamo la forza opposta. Applichiamo matematica, architettura pulita e pattern ad alte prestazioni per garantire che la tua infrastruttura mantenga l\'ordine mentre cresce in modo esponenziale.',
+                    exp_label: 'Competenza', exp_title: 'Architettura d\'élite',
+                    exp_text: 'Soluzioni B2B progettate per ambienti mission-critical. Costruiamo le fondamenta digitali delle aziende più esigenti del mercato.',
+                    s1_t: 'Architettura dei sistemi', s1_d: 'Progettazione di microservizi, modellazione del dominio (DDD) e pattern architetturali che sostengono un\'evoluzione costante senza accumulare debito tecnico.',
+                    s2_t: 'Infrastruttura Cloud', s2_d: 'Provisioning automatizzato (IaC), orchestrazione con Kubernetes, ottimizzazione dei costi e alta disponibilità distribuita a livello globale.',
+                    s3_t: 'API scalabili', s3_d: 'Integrazioni robuste, gateway sicuri ed elaborazione asincrona in grado di gestire milioni di richieste al secondo.',
+                    contact_title: 'Pronto a trasformare<br>la tua operatività?',
+                    contact_text: 'Parla con i nostri ingegneri architetti e scopri come possiamo strutturare la prossima fase di crescita della tua azienda.',
+                    contact_cta: 'Prenota una consulenza tecnica',
+                    social_label: 'Seguici',
+                    terms: 'Termini', privacy: 'Privacy',
+                    copy: '&copy; 2026 Entropy Sistemas. Tutti i diritti riservati.'
+                },
+                'es': {
+                    short: 'ES', htmlLang: 'es',
+                    nav_services: 'Servicios', nav_concept: 'Concepto', nav_contact: 'Contacto',
+                    cta_start: 'Iniciar proyecto',
+                    tagline: 'Dominando la complejidad. <br class="md:hidden">Escalando el futuro.',
+                    explore: 'Explorar soluciones',
+                    scroll: 'Deslizar',
+                    about_label: 'El Concepto',
+                    about_title: `Transformamos el ${hl('desorden tecnológico')} en sistemas precisos, resilientes e infinitamente escalables.`,
+                    about_text: 'La entropía dicta que todo sistema cerrado camina hacia el desorden. En la ingeniería de software, somos la fuerza opuesta. Aplicamos matemáticas, arquitectura limpia y patrones de alto rendimiento para garantizar que tu infraestructura mantenga el orden mientras crece de forma exponencial.',
+                    exp_label: 'Experiencia', exp_title: 'Arquitectura de élite',
+                    exp_text: 'Soluciones B2B diseñadas para entornos de misión crítica. Construimos los cimientos digitales de las empresas más exigentes del mercado.',
+                    s1_t: 'Arquitectura de sistemas', s1_d: 'Diseño de microservicios, modelado de dominios (DDD) y patrones arquitectónicos que soportan una evolución constante sin acumular deuda técnica.',
+                    s2_t: 'Infraestructura Cloud', s2_d: 'Aprovisionamiento automatizado (IaC), orquestación con Kubernetes, optimización de costos y alta disponibilidad distribuida globalmente.',
+                    s3_t: 'APIs escalables', s3_d: 'Integraciones robustas, gateways seguros y procesamiento asíncrono capaz de manejar millones de solicitudes por segundo.',
+                    contact_title: '¿Listo para transformar<br>tu operación?',
+                    contact_text: 'Habla con nuestros ingenieros arquitectos y descubre cómo podemos estructurar la próxima fase de crecimiento de tu empresa.',
+                    contact_cta: 'Agendar consultoría técnica',
+                    social_label: 'Síguenos',
+                    terms: 'Términos', privacy: 'Privacidad',
+                    copy: '&copy; 2026 Entropy Sistemas. Todos los derechos reservados.'
+                },
+                'zh-CN': {
+                    short: '中文', htmlLang: 'zh-CN',
+                    nav_services: '服务', nav_concept: '理念', nav_contact: '联系我们',
+                    cta_start: '启动项目',
+                    tagline: '驾驭复杂性。<br class="md:hidden">扩展未来。',
+                    explore: '探索解决方案',
+                    scroll: '滚动',
+                    about_label: '我们的理念',
+                    about_title: `我们将${hl('技术无序')}转化为精确、稳健且可无限扩展的系统。`,
+                    about_text: '熵定律指出，任何封闭系统都会走向无序。在软件工程中，我们是与之对抗的力量。我们运用数学、整洁架构和高性能模式，确保您的基础设施在指数级增长的同时保持秩序。',
+                    exp_label: '专长', exp_title: '精英架构',
+                    exp_text: '为关键任务环境量身打造的 B2B 解决方案。我们为市场上要求最严苛的企业构建数字基础。',
+                    s1_t: '系统架构', s1_d: '微服务设计、领域建模（DDD）以及架构模式，支持持续演进，同时不累积技术债务。',
+                    s2_t: '云基础设施', s2_d: '自动化部署（IaC）、Kubernetes 编排、成本优化以及全球分布式高可用。',
+                    s3_t: '可扩展 API', s3_d: '稳健的集成、安全的网关，以及能够处理每秒数百万请求的异步处理能力。',
+                    contact_title: '准备好变革<br>您的业务了吗？',
+                    contact_text: '与我们的架构工程师交流，了解我们如何为贵公司的下一阶段增长构建体系。',
+                    contact_cta: '预约技术咨询',
+                    social_label: '关注我们',
+                    terms: '条款', privacy: '隐私',
+                    copy: '&copy; 2026 Entropy Sistemas. 保留所有权利。'
+                }
+            };
+
+            // Extra strings: "Sistemas" word, scheduling modal, WhatsApp messages
+            const EXTRA = {
+                'pt-BR': {
+                    sys: 'Sistemas',
+                    modal_title: 'Qual é o seu projeto?',
+                    modal_sub: 'Escolha uma opção e abriremos o WhatsApp com a mensagem pronta.',
+                    opt_site: 'Site', opt_system: 'Sistema', opt_app: 'Aplicativo', opt_auto: 'Automação', opt_other: 'Outro',
+                    msg_site: `Olá! Gostaria de fazer uma entrevista, pois gostaria de fazer um site.`,
+                    msg_system: `Olá! Gostaria de fazer uma entrevista, pois gostaria de fazer um sistema.`,
+                    msg_app: `Olá! Gostaria de fazer uma entrevista, pois gostaria de fazer um aplicativo.`,
+                    msg_auto: `Olá! Gostaria de fazer uma entrevista, pois gostaria de fazer uma automação.`,
+                    msg_other: `Olá, gostaria de falar com vocês sobre meu projeto.`
+                },
+                'en-US': {
+                    sys: 'Systems',
+                    modal_title: 'What is your project?',
+                    modal_sub: 'Pick an option and we will open WhatsApp with the message ready.',
+                    opt_site: 'Website', opt_system: 'System', opt_app: 'App', opt_auto: 'Automation', opt_other: 'Other',
+                    msg_site: `Hello! I would like to schedule an interview because I would like to build a website.`,
+                    msg_system: `Hello! I would like to schedule an interview because I would like to build a system.`,
+                    msg_app: `Hello! I would like to schedule an interview because I would like to build an app.`,
+                    msg_auto: `Hello! I would like to schedule an interview because I would like to build an automation.`,
+                    msg_other: `Hello, I would like to talk to you about my project.`
+                },
+                'ru': {
+                    sys: 'Системы',
+                    modal_title: 'Какой у вас проект?',
+                    modal_sub: 'Выберите вариант — мы откроем WhatsApp с готовым сообщением.',
+                    opt_site: 'Сайт', opt_system: 'Система', opt_app: 'Приложение', opt_auto: 'Автоматизация', opt_other: 'Другое',
+                    msg_site: `Здравствуйте! Я хотел бы записаться на собеседование, так как хочу создать сайт.`,
+                    msg_system: `Здравствуйте! Я хотел бы записаться на собеседование, так как хочу разработать систему.`,
+                    msg_app: `Здравствуйте! Я хотел бы записаться на собеседование, так как хочу создать приложение.`,
+                    msg_auto: `Здравствуйте! Я хотел бы записаться на собеседование, так как хочу внедрить автоматизацию.`,
+                    msg_other: `Здравствуйте, я хотел бы обсудить с вами свой проект.`
+                },
+                'fr': {
+                    sys: 'Systèmes',
+                    modal_title: `Quel est votre projet ?`,
+                    modal_sub: `Choisissez une option et nous ouvrirons WhatsApp avec le message prêt.`,
+                    opt_site: 'Site web', opt_system: 'Système', opt_app: 'Application', opt_auto: 'Automatisation', opt_other: 'Autre',
+                    msg_site: `Bonjour ! J'aimerais prendre rendez-vous pour un entretien, car je souhaite créer un site web.`,
+                    msg_system: `Bonjour ! J'aimerais prendre rendez-vous pour un entretien, car je souhaite créer un système.`,
+                    msg_app: `Bonjour ! J'aimerais prendre rendez-vous pour un entretien, car je souhaite créer une application.`,
+                    msg_auto: `Bonjour ! J'aimerais prendre rendez-vous pour un entretien, car je souhaite mettre en place une automatisation.`,
+                    msg_other: `Bonjour, j'aimerais discuter de mon projet avec vous.`
+                },
+                'it': {
+                    sys: 'Sistemi',
+                    modal_title: `Qual è il tuo progetto?`,
+                    modal_sub: `Scegli un'opzione e apriremo WhatsApp con il messaggio già pronto.`,
+                    opt_site: 'Sito web', opt_system: 'Sistema', opt_app: 'App', opt_auto: 'Automazione', opt_other: 'Altro',
+                    msg_site: `Ciao! Vorrei fissare un colloquio perché vorrei realizzare un sito web.`,
+                    msg_system: `Ciao! Vorrei fissare un colloquio perché vorrei realizzare un sistema.`,
+                    msg_app: `Ciao! Vorrei fissare un colloquio perché vorrei realizzare un'app.`,
+                    msg_auto: `Ciao! Vorrei fissare un colloquio perché vorrei realizzare un'automazione.`,
+                    msg_other: `Ciao, vorrei parlare con voi del mio progetto.`
+                },
+                'es': {
+                    sys: 'Sistemas',
+                    modal_title: '¿Cuál es tu proyecto?',
+                    modal_sub: 'Elige una opción y abriremos WhatsApp con el mensaje listo.',
+                    opt_site: 'Sitio web', opt_system: 'Sistema', opt_app: 'Aplicación', opt_auto: 'Automatización', opt_other: 'Otro',
+                    msg_site: `¡Hola! Me gustaría hacer una entrevista porque quiero crear un sitio web.`,
+                    msg_system: `¡Hola! Me gustaría hacer una entrevista porque quiero crear un sistema.`,
+                    msg_app: `¡Hola! Me gustaría hacer una entrevista porque quiero crear una aplicación.`,
+                    msg_auto: `¡Hola! Me gustaría hacer una entrevista porque quiero crear una automatización.`,
+                    msg_other: `Hola, me gustaría hablar con ustedes sobre mi proyecto.`
+                },
+                'zh-CN': {
+                    sys: '系统',
+                    modal_title: '您的项目是什么？',
+                    modal_sub: '请选择一项，我们将打开 WhatsApp 并填好消息。',
+                    opt_site: '网站', opt_system: '系统', opt_app: '应用程序', opt_auto: '自动化', opt_other: '其他',
+                    msg_site: `您好！我想预约一次面谈，因为我想制作一个网站。`,
+                    msg_system: `您好！我想预约一次面谈，因为我想开发一个系统。`,
+                    msg_app: `您好！我想预约一次面谈，因为我想开发一个应用程序。`,
+                    msg_auto: `您好！我想预约一次面谈，因为我想做一套自动化方案。`,
+                    msg_other: `您好，我想和你们聊聊我的项目。`
+                }
+            };
+            Object.keys(EXTRA).forEach(k => Object.assign(I18N[k], EXTRA[k]));
+
+            // "What we do" section strings
+            const WHAT = {
+                'pt-BR': {
+                    wd_label: 'O que fazemos', wd_title: 'Soluções digitais sob medida',
+                    wd_text: 'Da ideia ao ar: desenhamos, desenvolvemos e colocamos em produção o software que o seu negócio precisa.',
+                    wd1_t: 'Sites', wd1_d: 'Sites institucionais, landing pages e e-commerces rápidos, responsivos e otimizados para buscadores, com design único que traduz a identidade da sua marca e converte visitantes em clientes.',
+                    wd2_t: 'Sistemas', wd2_d: 'Sistemas web sob medida para gestão, ERP, CRM e painéis administrativos. Centralizamos processos, organizamos dados e entregamos plataformas seguras que crescem junto com a sua operação.',
+                    wd3_t: 'Aplicativos', wd3_d: 'Apps para iOS e Android, nativos ou multiplataforma, com experiência fluida, notificações e integração com seus sistemas, do protótipo à publicação nas lojas.',
+                    wd4_t: 'Automações', wd4_d: 'Eliminamos tarefas repetitivas integrando ferramentas, APIs e fluxos de trabalho: cobranças, relatórios, atendimento e cadastros rodando sozinhos, com menos erros e mais tempo para o que importa.'
+                },
+                'en-US': {
+                    wd_label: 'What we do', wd_title: 'Custom digital solutions',
+                    wd_text: 'From idea to launch: we design, build and ship the software your business needs.',
+                    wd1_t: 'Websites', wd1_d: 'Corporate sites, landing pages and e-commerce stores that are fast, responsive and search-optimized, with a unique design that reflects your brand and turns visitors into customers.',
+                    wd2_t: 'Systems', wd2_d: 'Custom web systems for management, ERP, CRM and admin dashboards. We centralize processes, organize data and deliver secure platforms that grow with your operation.',
+                    wd3_t: 'Apps', wd3_d: 'iOS and Android apps, native or cross-platform, with a smooth experience, notifications and integration with your systems, from prototype to store release.',
+                    wd4_t: 'Automations', wd4_d: 'We eliminate repetitive tasks by connecting tools, APIs and workflows: billing, reports, support and data entry running on their own, with fewer errors and more time for what matters.'
+                },
+                'ru': {
+                    wd_label: 'Чем мы занимаемся', wd_title: 'Цифровые решения под ключ',
+                    wd_text: 'От идеи до запуска: мы проектируем, разрабатываем и выпускаем ПО, которое нужно вашему бизнесу.',
+                    wd1_t: 'Сайты', wd1_d: 'Корпоративные сайты, лендинги и интернет-магазины — быстрые, адаптивные и оптимизированные для поиска, с уникальным дизайном, отражающим ваш бренд и превращающим посетителей в клиентов.',
+                    wd2_t: 'Системы', wd2_d: 'Веб-системы под заказ для управления, ERP, CRM и административных панелей. Мы объединяем процессы, упорядочиваем данные и создаем безопасные платформы, которые растут вместе с вашим бизнесом.',
+                    wd3_t: 'Приложения', wd3_d: 'Приложения для iOS и Android, нативные или кроссплатформенные, с плавным интерфейсом, уведомлениями и интеграцией с вашими системами — от прототипа до публикации в магазинах.',
+                    wd4_t: 'Автоматизация', wd4_d: 'Мы избавляем от рутины, объединяя инструменты, API и рабочие процессы: выставление счетов, отчеты, поддержка и ввод данных работают сами, с меньшим числом ошибок и большим запасом времени на главное.'
+                },
+                'fr': {
+                    wd_label: 'Ce que nous faisons', wd_title: 'Solutions numériques sur mesure',
+                    wd_text: `De l'idée à la mise en ligne : nous concevons, développons et livrons le logiciel dont votre entreprise a besoin.`,
+                    wd1_t: 'Sites web', wd1_d: `Sites vitrines, landing pages et boutiques en ligne rapides, responsives et optimisés pour le référencement, avec un design unique qui reflète votre marque et transforme les visiteurs en clients.`,
+                    wd2_t: 'Systèmes', wd2_d: `Systèmes web sur mesure pour la gestion, l'ERP, le CRM et les tableaux de bord d'administration. Nous centralisons les processus, organisons les données et livrons des plateformes sécurisées qui évoluent avec votre activité.`,
+                    wd3_t: 'Applications', wd3_d: `Applications iOS et Android, natives ou multiplateformes, avec une expérience fluide, des notifications et une intégration à vos systèmes, du prototype à la publication sur les stores.`,
+                    wd4_t: 'Automatisations', wd4_d: `Nous supprimons les tâches répétitives en connectant outils, API et flux de travail : facturation, rapports, support et saisies fonctionnent seuls, avec moins d'erreurs et plus de temps pour l'essentiel.`
+                },
+                'it': {
+                    wd_label: 'Cosa facciamo', wd_title: 'Soluzioni digitali su misura',
+                    wd_text: `Dall'idea al lancio: progettiamo, sviluppiamo e mettiamo online il software di cui la tua azienda ha bisogno.`,
+                    wd1_t: 'Siti web', wd1_d: `Siti aziendali, landing page e e-commerce veloci, responsive e ottimizzati per i motori di ricerca, con un design unico che riflette il tuo brand e trasforma i visitatori in clienti.`,
+                    wd2_t: 'Sistemi', wd2_d: `Sistemi web su misura per gestione, ERP, CRM e pannelli di amministrazione. Centralizziamo i processi, organizziamo i dati e consegniamo piattaforme sicure che crescono insieme alla tua attività.`,
+                    wd3_t: 'App', wd3_d: `App per iOS e Android, native o multipiattaforma, con un'esperienza fluida, notifiche e integrazione con i tuoi sistemi, dal prototipo alla pubblicazione sugli store.`,
+                    wd4_t: 'Automazioni', wd4_d: `Eliminiamo i compiti ripetitivi collegando strumenti, API e flussi di lavoro: fatturazione, report, assistenza e inserimento dati vanno avanti da soli, con meno errori e più tempo per ciò che conta.`
+                },
+                'es': {
+                    wd_label: 'Qué hacemos', wd_title: 'Soluciones digitales a medida',
+                    wd_text: 'De la idea al lanzamiento: diseñamos, desarrollamos y ponemos en producción el software que tu negocio necesita.',
+                    wd1_t: 'Sitios web', wd1_d: 'Sitios corporativos, landing pages y tiendas en línea rápidos, responsivos y optimizados para buscadores, con un diseño único que refleja tu marca y convierte visitantes en clientes.',
+                    wd2_t: 'Sistemas', wd2_d: 'Sistemas web a medida para gestión, ERP, CRM y paneles administrativos. Centralizamos procesos, organizamos datos y entregamos plataformas seguras que crecen junto con tu operación.',
+                    wd3_t: 'Aplicaciones', wd3_d: 'Apps para iOS y Android, nativas o multiplataforma, con una experiencia fluida, notificaciones e integración con tus sistemas, del prototipo a la publicación en las tiendas.',
+                    wd4_t: 'Automatizaciones', wd4_d: 'Eliminamos las tareas repetitivas integrando herramientas, APIs y flujos de trabajo: cobros, informes, atención y registros funcionando solos, con menos errores y más tiempo para lo importante.'
+                },
+                'zh-CN': {
+                    wd_label: '我们的业务', wd_title: '量身定制的数字化解决方案',
+                    wd_text: '从创意到上线：我们设计、开发并交付您的企业所需的软件。',
+                    wd1_t: '网站', wd1_d: '企业官网、落地页和电商网站，速度快、自适应、对搜索引擎友好，以独特的设计体现品牌形象，把访客转化为客户。',
+                    wd2_t: '系统', wd2_d: '为管理、ERP、CRM 和后台面板定制的 Web 系统。我们整合流程、梳理数据，交付随业务一同成长的安全平台。',
+                    wd3_t: '应用程序', wd3_d: '原生或跨平台的 iOS 和 Android 应用，体验流畅，支持推送通知并与您的系统集成，从原型到上架应用商店。',
+                    wd4_t: '自动化', wd4_d: '通过连接工具、API 和工作流，消除重复性工作：收费、报表、客服和数据录入自动运行，减少错误，让您把时间用在重要的事情上。'
+                }
+            };
+            Object.keys(WHAT).forEach(k => Object.assign(I18N[k], WHAT[k]));
+
+            let currentLang = 'pt-BR';
+            let PC = '255,255,255'; // particle color (white in dark mode, near-black in light mode)
+
+            // --- Theme (dark / light) ---
+            function applyTheme(mode) {
+                const light = mode === 'light';
+                document.documentElement.classList.toggle('light', light);
+                PC = light ? '10,10,10' : '255,255,255';
+                document.getElementById('theme-sun').classList.toggle('hidden', light);
+                document.getElementById('theme-moon').classList.toggle('hidden', !light);
+                try { localStorage.setItem('entropy-theme', light ? 'light' : 'dark'); } catch (e) {}
+            }
+            document.getElementById('theme-btn').addEventListener('click', () => {
+                applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
+            });
+            
+            // Verifica o tema do sistema na carga inicial
+            let initialTheme = 'dark'; // fallback
+            try {
+                const saved = localStorage.getItem('entropy-theme');
+                if (saved) {
+                    initialTheme = saved;
+                } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                    initialTheme = 'light';
+                }
+            } catch (e) {}
+            applyTheme(initialTheme);
+
+            // --- Schedule modal -> WhatsApp with translated message ---
+            const modal = document.getElementById('schedule-modal');
+            const openModal = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); document.body.style.overflow = 'hidden'; };
+            const closeModal = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); document.body.style.overflow = ''; };
+            document.getElementById('schedule-btn').addEventListener('click', (e) => { e.preventDefault(); openModal(); });
+            document.getElementById('modal-close').addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+            document.querySelectorAll('.schedule-opt').forEach(b => {
+                b.addEventListener('click', () => {
+                    const dict = I18N[currentLang] || I18N['pt-BR'];
+                    const msg = dict['msg_' + b.dataset.opt];
+                    window.open('https://wa.me/5522992294604?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+                    closeModal();
+                });
+            });
+
+            function applyLang(code) {
+                const dict = I18N[code] || I18N['pt-BR'];
+                document.documentElement.lang = dict.htmlLang;
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const k = el.getAttribute('data-i18n');
+                    if (dict[k] !== undefined) el.innerHTML = dict[k];
+                });
+                document.querySelectorAll('[data-i18n-html]').forEach(el => {
+                    const k = el.getAttribute('data-i18n-html');
+                    if (dict[k] !== undefined) el.innerHTML = dict[k];
+                });
+                document.getElementById('lang-current').textContent = dict.short;
+                currentLang = I18N[code] ? code : 'pt-BR';
+                const sysWord = dict.sys.toUpperCase();
+                document.querySelectorAll('[data-sys]').forEach(el => { el.textContent = sysWord; });
+                document.querySelectorAll('[data-sys-spaced]').forEach(el => {
+                    el.textContent = (code === 'zh-CN') ? sysWord : [...sysWord].join(' ');
+                });
+                document.querySelectorAll('.lang-opt').forEach(b => {
+                    b.classList.toggle('text-white', b.dataset.lang === code);
+                    b.classList.toggle('bg-white/10', b.dataset.lang === code);
+                });
+                try { localStorage.setItem('entropy-lang', code); } catch (e) {}
+            }
+
+            const langBtn = document.getElementById('lang-btn');
+            const langMenu = document.getElementById('lang-menu');
+            langBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const open = langMenu.classList.toggle('open');
+                langBtn.setAttribute('aria-expanded', open);
+            });
+            document.querySelectorAll('.lang-opt').forEach(b => {
+                b.addEventListener('click', () => {
+                    applyLang(b.dataset.lang);
+                    langMenu.classList.remove('open');
+                    langBtn.setAttribute('aria-expanded', 'false');
+                });
+            });
+            document.addEventListener('click', () => {
+                langMenu.classList.remove('open');
+                langBtn.setAttribute('aria-expanded', 'false');
+            });
+
+            let savedLang = null;
+            try { savedLang = localStorage.getItem('entropy-lang'); } catch (e) {}
+            
+            if (!savedLang) {
+                // Detecta o idioma nativo do navegador
+                const nav = (navigator.language || navigator.userLanguage || 'pt-BR').toLowerCase();
+                
+                if (nav.includes('pt')) savedLang = 'pt-BR';
+                else if (nav.includes('en')) savedLang = 'en-US';
+                else if (nav.includes('ru')) savedLang = 'ru';
+                else if (nav.includes('fr')) savedLang = 'fr';
+                else if (nav.includes('it')) savedLang = 'it';
+                else if (nav.includes('es')) savedLang = 'es';
+                else if (nav.includes('zh')) savedLang = 'zh-CN';
+                else savedLang = 'en-US'; // Se for um idioma não suportado, cai para o Inglês global
+            }
+            
+            applyLang(savedLang);
+
+            // --- 1. GSAP SCROLL ANIMATIONS ---
+            gsap.registerPlugin(ScrollTrigger);
+
+            // Hero entrance animation
+            gsap.fromTo(".gsap-hero-element", 
+                { y: 30, opacity: 0 },
+                { y: 0, opacity: 1, duration: 1.2, stagger: 0.2, ease: "power3.out", delay: 0.2 }
+            );
+
+            // Reveal animations for scroll
+            gsap.utils.toArray('.gsap-reveal').forEach(element => {
+                gsap.fromTo(element,
+                    { y: 40, opacity: 0 },
+                    {
+                        y: 0, 
+                        opacity: 1,
+                        duration: 1,
+                        ease: "power2.out",
+                        scrollTrigger: {
+                            trigger: element,
+                            start: "top 85%",
+                            toggleActions: "play none none reverse"
+                        }
+                    }
+                );
+            });
+
+            // Navbar background change on scroll
+            const navbar = document.getElementById('navbar');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 50) {
+                    navbar.classList.add('shadow-lg', 'shadow-black/50');
+                } else {
+                    navbar.classList.remove('shadow-lg', 'shadow-black/50');
+                }
+            });
+
+            // --- 2. HTML5 CANVAS ENTROPY SIMULATION (background grid) ---
+            const canvas = document.getElementById('entropy-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            let width, height;
+            let particles = [];
+            
+            const PADDING = 50;
+            let SPACING = 25;
+            
+            // States: 0 = Order (Grid), 1 = Entropy (Chaos)
+            let simulationState = 0; 
+
+            // Global mouse tracking e física fluida
+            const mouse = { x: -1000, y: -1000, vx: 0, vy: 0 };
+            let lastMouse = { x: -1000, y: -1000 };
+            window.addEventListener('mousemove', (e) => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+                mouse.vx = mouse.x - lastMouse.x;
+                mouse.vy = mouse.y - lastMouse.y;
+                lastMouse.x = mouse.x;
+                lastMouse.y = mouse.y;
+            });
+            
+            function resize() {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                SPACING = width < 768 ? 35 : 25;
+            }
+
+            class Particle {
+                constructor(x, y) {
+                    this.originX = x;
+                    this.originY = y;
+                    this.x = x;
+                    this.y = y;
+                    this.targetX = x;
+                    this.targetY = y;
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.friction = 0.92;
+                    this.ease = 0.02 + Math.random() * 0.04;
+                    this.baseAlpha = 0.1 + Math.random() * 0.3;
+                    this.alpha = this.baseAlpha;
+                    this.size = 0.5 + Math.random() * 1.5; // Star size variation
+                    this.phase = Math.random() * Math.PI * 2; // Twinkle phase
+                }
+
+                triggerEntropy() {
+                    this.targetX = Math.random() * width;
+                    this.targetY = Math.random() * height;
+                    this.ease = 0.005 + Math.random() * 0.01;
+                }
+
+                update() {
+                    if (simulationState === 1) {
+                        let dx = this.targetX - this.x;
+                        let dy = this.targetY - this.y;
+                        
+                        this.vx += dx * this.ease;
+                        this.vy += dy * this.ease;
+                        
+                        // SUAVIZADO: Redução drástica da vibração aleatória para evitar náusea
+                        this.vx += (Math.random() - 0.5) * 0.03;
+                        this.vy += (Math.random() - 0.5) * 0.03;
+                        
+                        // Interaction: Repel and flow with mouse
+                        let mdx = this.x - mouse.x;
+                        let mdy = this.y - mouse.y;
+                        let distSq = mdx*mdx + mdy*mdy;
+                        let interactRadius = 150;
+                        if (distSq < interactRadius * interactRadius && distSq > 0) {
+                            let dist = Math.sqrt(distSq);
+                            let force = (interactRadius - dist) / interactRadius;
+                            // SUAVIZADO: Força de repulsão pelo mouse reduzida
+                            this.vx += (mdx / dist) * force * 0.2;
+                            this.vy += (mdy / dist) * force * 0.2;
+                            // Inject drag velocity
+                            this.vx += mouse.vx * force * 0.015;
+                            this.vy += mouse.vy * force * 0.015;
+                        }
+                        
+                        this.vx *= this.friction;
+                        this.vy *= this.friction;
+                        this.x += this.vx;
+                        this.y += this.vy;
+
+                        // SUAVIZADO: Mudam de direção com menos frequência
+                        if (Math.random() < 0.002) {
+                            this.targetX = Math.random() * width;
+                            this.targetY = Math.random() * height;
+                        }
+                    } else {
+                        this.x = this.originX;
+                        this.y = this.originY;
+                    }
+                }
+
+                draw(time = 0) {
+                    // Twinkling effect based on time and unique phase
+                    let currentAlpha = this.baseAlpha + Math.sin(time * 0.002 + this.phase) * 0.2;
+                    currentAlpha = Math.max(0.05, Math.min(1, currentAlpha));
+
+                    ctx.fillStyle = `rgba(${PC}, ${currentAlpha})`;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            function initParticles() {
+                particles = [];
+                const cols = Math.floor((width - PADDING * 2) / SPACING);
+                const rows = Math.floor((height - PADDING * 2) / SPACING);
+                
+                const startX = (width - cols * SPACING) / 2;
+                const startY = (height - rows * SPACING) / 2;
+
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        if (Math.random() > 0.3) {
+                            particles.push(new Particle(startX + i * SPACING, startY + j * SPACING));
+                        }
+                    }
+                }
+            }
+
+            function animate(time = 0) {
+                // Decay da velocidade do mouse para frear com suavidade
+                mouse.vx *= 0.85;
+                mouse.vy *= 0.85;
+
+                ctx.clearRect(0, 0, width, height);
+                
+                particles.forEach(p => {
+                    p.update();
+                    p.draw(time);
+                });
+                
+                if (simulationState === 1 && width > 768) {
+                    ctx.lineWidth = 0.2;
+                    for (let i = 0; i < particles.length; i += 4) {
+                        for (let j = i + 1; j < particles.length; j += 4) {
+                            const p1 = particles[i];
+                            const p2 = particles[j];
+                            const dx = p1.x - p2.x;
+                            const dy = p1.y - p2.y;
+                            const distSq = dx*dx + dy*dy;
+                            
+                            if (distSq < 4000) {
+                                ctx.strokeStyle = `rgba(${PC}, ${0.05 - (distSq/4000) * 0.05})`;
+                                ctx.beginPath();
+                                ctx.moveTo(p1.x, p1.y);
+                                ctx.lineTo(p2.x, p2.y);
+                                ctx.stroke();
+                            }
+                        }
+                    }
+                }
+                
+                requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', () => {
+                resize();
+                if(simulationState === 0) initParticles();
+            });
+            
+            resize();
+            initParticles();
+            animate();
+
+            // The Entropy Trigger
+            setTimeout(() => {
+                simulationState = 1;
+                particles.forEach(p => p.triggerEntropy());
+                const displacement = document.getElementById('displacement');
+                if(displacement) displacement.setAttribute('scale', '6');
+            }, 2500);
+
+            // Scrolling pushes particles
+            let lastScrollY = window.scrollY;
+            window.addEventListener('scroll', () => {
+                if (simulationState === 1) {
+                    const currentScrollY = window.scrollY;
+                    const deltaY = currentScrollY - lastScrollY;
+                    // SUAVIZADO: A rolagem empurra as partículas mais suavemente
+                    particles.forEach(p => { p.vy -= deltaY * 0.02; });
+                    lastScrollY = currentScrollY;
+                }
+            });
+
+            // --- 3. THANOS-SNAP VAPORIZATION ON "OPY" ---
+            // Intensity grows continuously along x: O (weak) -> P (stronger) -> Y (strongest)
+            const vCanvas = document.getElementById('vapor-canvas');
+            const vctx = vCanvas.getContext('2d');
+            const letterEls = [document.getElementById('L-o'), document.getElementById('L-p'), document.getElementById('L-y')];
+            const vapor = { power: 0.3 };
+            const dust = [];
+            const MAX_DUST = 1800;
+
+            function sizeVapor() {
+                const dpr = window.devicePixelRatio || 1;
+                vCanvas.width = window.innerWidth * dpr;
+                vCanvas.height = window.innerHeight * dpr;
+                vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+            sizeVapor();
+            window.addEventListener('resize', sizeVapor);
+
+            // Animate filter strength per letter (organic, always moving)
+            [['o', 3, 6, 3.4], ['p', 10, 18, 2.8], ['y', 22, 40, 2.2]].forEach(([k, a, b, dur]) => {
+                const el = document.getElementById('d-' + k);
+                const proxy = { s: a };
+                gsap.to(proxy, {
+                    s: b, duration: dur, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1,
+                    onUpdate: () => el.setAttribute('scale', proxy.s.toFixed(2))
+                });
+            });
+
+            // Snap build-up: vapor power ramps up after load
+            gsap.to(vapor, { power: 1, duration: 3.5, delay: 1.2, ease: 'power2.inOut' });
+
+            const ZONES = 3; // left / middle / right of each letter
+            function spawnDust() {
+                const rects = letterEls.map(e => e.getBoundingClientRect());
+                const first = rects[0], last = rects[2];
+                if (last.bottom < 0 || first.top > window.innerHeight) return;
+                const x0 = first.left, x1 = last.right, span = Math.max(1, x1 - x0);
+                const letterBoost = [0.55, 0.85, 1.15];
+
+                rects.forEach((r, li) => {
+                    for (let z = 0; z < ZONES; z++) {
+                        const zl = r.left + (z / ZONES) * r.width;
+                        const zw = r.width / ZONES;
+                        const t = ((zl + zw / 2) - x0) / span;              // 0..1 across O-left .. Y-right
+                        const I = (0.1 + 0.9 * Math.pow(t, 1.35)) * letterBoost[li];
+                        const rate = I * vapor.power * 2.4;                  // particles per frame per zone
+                        let n = Math.floor(rate) + (Math.random() < (rate % 1) ? 1 : 0);
+                        while (n-- > 0 && dust.length < MAX_DUST) {
+                            const life = (70 + Math.random() * 110) * (0.7 + I * 0.8);
+                            const big = Math.random() < 0.18;
+                            dust.push({
+                                x: zl + Math.random() * zw,
+                                y: r.top + r.height * (0.16 + Math.random() * 0.68),
+                                vx: (0.25 + Math.random() * 1.1) * (0.5 + I * 1.6),
+                                vy: (Math.random() - 0.62) * 0.9 - I * 0.25,
+                                size: big ? 1.6 + Math.random() * 2.2 : 0.6 + Math.random() * 1.3,
+                                shard: big,
+                                rot: Math.random() * Math.PI,
+                                vr: (Math.random() - 0.5) * 0.18,
+                                life, max: life,
+                                phase: Math.random() * Math.PI * 2,
+                                wob: 0.03 + Math.random() * 0.07
+                            });
+                        }
+                    }
+                });
+            }
+
+            function drawVapor(time) {
+                vctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+                spawnDust();
+                for (let i = dust.length - 1; i >= 0; i--) {
+                    const d = dust[i];
+                    d.life--;
+                    if (d.life <= 0) { dust.splice(i, 1); continue; }
+
+                    // Interagir a fumaça com a passagem do mouse
+                    const dx = d.x - mouse.x;
+                    const dy = d.y - mouse.y;
+                    const distSq = dx*dx + dy*dy;
+                    if (distSq < 25000) { // aprox 158px de raio de colisão
+                        const dist = Math.sqrt(distSq);
+                        const force = (158 - dist) / 158;
+                        d.vx += (dx / dist) * force * 1.5;
+                        d.vy += (dy / dist) * force * 1.5;
+                        d.vx += mouse.vx * force * 0.08;
+                        d.vy += mouse.vy * force * 0.08;
+                    }
+
+                    // drifting, swirling motion (turbulence) + wind accelerating to the right
+                    d.vx += 0.012 + Math.sin(time * 0.002 + d.phase) * d.wob * 0.5;
+                    d.vy += Math.cos(time * 0.0027 + d.phase) * d.wob - 0.006;
+                    d.vx *= 0.995; d.vy *= 0.99;
+                    d.x += d.vx; d.y += d.vy;
+                    d.rot += d.vr;
+                    const k = d.life / d.max;
+                    const alpha = Math.min(1, k * 1.6) * 0.9;
+                    vctx.fillStyle = `rgba(${PC},${alpha.toFixed(3)})`;
+                    if (d.shard) {
+                        vctx.save();
+                        vctx.translate(d.x, d.y);
+                        vctx.rotate(d.rot);
+                        vctx.fillRect(-d.size / 2, -d.size / 3, d.size, d.size * 0.66);
+                        vctx.restore();
+                    } else {
+                        vctx.fillRect(d.x, d.y, d.size, d.size);
+                    }
+                }
+                requestAnimationFrame(drawVapor);
+            }
+            requestAnimationFrame(drawVapor);
+
+            // --- 4. MAGNETIC LOGO INTERACTION ---
+            const heroChars = document.querySelectorAll('.hero-char');
+            window.addEventListener('mousemove', (e) => {
+                heroChars.forEach((char) => {
+                    const rect = char.getBoundingClientRect();
+                    const charX = rect.left + rect.width / 2;
+                    const charY = rect.top + rect.height / 2;
+                    const dx = e.clientX - charX;
+                    const dy = e.clientY - charY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < 120) {
+                        const force = (120 - dist) / 120;
+                        // SUAVIZADO: Efeito magnético reduzido, puxa menos a letra e gira bem menos
+                        gsap.to(char, {
+                            x: mouse.vx * force * 0.4 - (dx / dist) * force * 6,
+                            y: mouse.vy * force * 0.4 - (dy / dist) * force * 6,
+                            rotation: mouse.vx * force * 0.05,
+                            scale: 1 + force * 0.04,
+                            duration: 0.3,
+                            ease: "power2.out"
+                        });
+                    } else {
+                        // Elastic bounce back
+                        gsap.to(char, { x: 0, y: 0, rotation: 0, scale: 1, duration: 0.8, ease: "elastic.out(1, 0.4)" });
+                    }
+                });
+            });
+
+        });
+    </script>
+</body>
+</html>
